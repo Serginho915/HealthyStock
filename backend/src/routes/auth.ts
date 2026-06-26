@@ -1,5 +1,6 @@
 import { Response, Router } from "express";
 import { z } from "zod";
+import { asyncHandler } from "../middleware/asyncHandler.js";
 import {
   createAccessToken,
   createRefreshToken,
@@ -22,7 +23,7 @@ const credentialsSchema = z.object({
   password: z.string().min(1).max(200)
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", asyncHandler(async (req, res) => {
   if (!getAuthConfig().configured) {
     return res.status(503).json({ message: "Admin auth is not configured" });
   }
@@ -58,9 +59,9 @@ router.post("/login", async (req, res) => {
   const refreshToken = await createRefreshToken(user.id);
   setRefreshCookie(res, refreshToken);
   return res.json({ accessToken, user: { username: user.email, role: user.role } });
-});
+}));
 
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", asyncHandler(async (req, res) => {
   const refreshToken = readCookie(req.header("cookie") ?? "", refreshCookieName);
   if (!refreshToken) {
     return res.status(401).json({ message: "Missing refresh token" });
@@ -74,16 +75,16 @@ router.post("/refresh", async (req, res) => {
 
   setRefreshCookie(res, rotated.refreshToken);
   return res.json({ accessToken: rotated.accessToken });
-});
+}));
 
-router.post("/logout", async (req, res) => {
+router.post("/logout", asyncHandler(async (req, res) => {
   const refreshToken = readCookie(req.header("cookie") ?? "", refreshCookieName);
   if (refreshToken) {
     await revokeRefreshToken(refreshToken);
   }
   clearRefreshCookie(res);
   return res.json({ ok: true });
-});
+}));
 
 function setRefreshCookie(res: Response, token: string) {
   res.cookie(refreshCookieName, token, getRefreshCookieOptions());

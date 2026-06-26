@@ -3,9 +3,11 @@ import crypto from "node:crypto";
 import pg from "pg";
 
 const [, , emailArg, passwordArg] = process.argv;
+const password = passwordArg ?? process.env.SUPERADMIN_PASSWORD;
 
-if (!emailArg || !passwordArg) {
+if (!emailArg || !password) {
   console.error("Usage: npm run create-superadmin -- admin@example.com 'strong-password'");
+  console.error("Safer production usage: SUPERADMIN_PASSWORD='strong-password' npm run create-superadmin -- admin@example.com");
   process.exit(1);
 }
 
@@ -19,7 +21,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 try {
   await initDb();
   const email = emailArg.trim().toLowerCase();
-  const passwordHash = createPasswordHash(passwordArg);
+  const passwordHash = createPasswordHash(password);
   const result = await pool.query(
     `INSERT INTO users (id, email, password_hash, role, is_active)
      VALUES ($1, $2, $3, 'superadmin', TRUE)

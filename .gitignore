@@ -4,6 +4,7 @@ dist
 .env
 .env.*
 !.env.example
+!.env.production.example
 backend/data/subscribers.json
 backend/data/*.json
 backend/data/*.jsonl

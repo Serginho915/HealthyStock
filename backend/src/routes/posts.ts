@@ -1,9 +1,10 @@
 import { Router } from "express";
+import { asyncHandler } from "../middleware/asyncHandler.js";
 import { getPostBySlug, getPublicPosts } from "../services/postStore.js";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+router.get("/", asyncHandler(async (req, res) => {
   const search = String(req.query.search ?? "").trim().toLowerCase();
   const category = String(req.query.category ?? "").trim().toLowerCase();
   const posts = await getPublicPosts();
@@ -24,9 +25,9 @@ router.get("/", async (req, res) => {
     total: filtered.length,
     items: filtered
   });
-});
+}));
 
-router.get("/search", async (req, res) => {
+router.get("/search", asyncHandler(async (req, res) => {
   const q = String(req.query.q ?? "").trim().toLowerCase();
   if (!q) {
     return res.json({ items: [] });
@@ -50,9 +51,9 @@ router.get("/search", async (req, res) => {
     }));
 
   return res.json({ items });
-});
+}));
 
-router.get("/:slug", async (req, res) => {
+router.get("/:slug", asyncHandler(async (req, res) => {
   const { slug } = req.params;
   const post = await getPostBySlug(slug);
 
@@ -61,6 +62,6 @@ router.get("/:slug", async (req, res) => {
   }
 
   return res.json(post);
-});
+}));
 
 export default router;

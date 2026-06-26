@@ -1,5 +1,10 @@
 node_modules
 dist
+data/*.json
+data/*.jsonl
 npm-debug.log*
 .env
+.env.*
+!.env.example
+!.env.production.example
 .DS_Store

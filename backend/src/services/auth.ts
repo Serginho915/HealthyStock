@@ -41,8 +41,10 @@ export function validateProductionAuthConfig() {
   const config = getAuthConfig();
   const missing = [
     ["DATABASE_URL", process.env.DATABASE_URL],
+    ["CORS_ORIGIN", process.env.CORS_ORIGIN],
     ["JWT_SECRET", config.jwtSecret],
-    ["REFRESH_TOKEN_SECRET", config.refreshSecret]
+    ["REFRESH_TOKEN_SECRET", config.refreshSecret],
+    ["OPENROUTER_SITE_URL", process.env.OPENROUTER_SITE_URL]
   ]
     .filter(([, value]) => !value)
     .map(([key]) => key);
@@ -61,6 +63,23 @@ export function validateProductionAuthConfig() {
 
   if (config.jwtSecret === config.refreshSecret) {
     throw new Error("JWT_SECRET and REFRESH_TOKEN_SECRET must be different");
+  }
+
+  const corsOrigins = process.env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [];
+  if (corsOrigins.some((origin) => origin === "*")) {
+    throw new Error("CORS_ORIGIN cannot include * in production");
+  }
+
+  if (corsOrigins.some((origin) => origin.includes("localhost") || origin.includes("127.0.0.1"))) {
+    throw new Error("CORS_ORIGIN must use production frontend URL(s) in production");
+  }
+
+  if (process.env.OPENROUTER_SITE_URL?.includes("localhost")) {
+    throw new Error("OPENROUTER_SITE_URL must be your production site URL in production");
+  }
+
+  if (process.env.REFRESH_COOKIE_SAMESITE === "none" && !process.env.REFRESH_COOKIE_DOMAIN) {
+    throw new Error("REFRESH_COOKIE_DOMAIN is required when REFRESH_COOKIE_SAMESITE=none in production");
   }
 }
 

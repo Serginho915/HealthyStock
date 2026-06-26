@@ -94,7 +94,7 @@ Set stable, strong secrets in `backend/.env` or your hosting secret manager:
 
 Generate them once, keep them stable, and do not commit them:
 
-- `node -e "const c=require('crypto'); console.log('JWT_SECRET='+c.randomBytes(64).toString('base64url')); console.log('REFRESH_TOKEN_SECRET='+c.randomBytes(64).toString('base64url'))"`
+- `cd backend && npm run generate-secrets`
 
 Do not generate these secrets on every app startup. Changing them invalidates active admin sessions and refresh tokens.
 
@@ -103,6 +103,29 @@ For production Docker deploys, also set:
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+
+## Production Deployment (Docker)
+
+1. Prepare compose variables in the project root:
+   - `cp .env.production.example .env`
+   - edit `.env`
+   - set `POSTGRES_PASSWORD`, `NEXT_PUBLIC_API_URL`, and `NEXT_PUBLIC_SITE_URL`
+2. Prepare backend runtime variables:
+   - `cp backend/.env.production.example backend/.env`
+   - edit `backend/.env`
+   - set `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, SMTP values if needed
+3. Build and start:
+   - `docker compose -f docker-compose.prod.yml up --build -d`
+4. Create the first superadmin:
+   - safer shell-history friendly form:
+     - `SUPERADMIN_PASSWORD='your-strong-production-password' docker compose -f docker-compose.prod.yml exec -e SUPERADMIN_PASSWORD backend npm run create-superadmin -- admin@yourdomain.com`
+   - direct form:
+     - `docker compose -f docker-compose.prod.yml exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-production-password'`
+5. Verify:
+   - `docker compose -f docker-compose.prod.yml ps`
+   - `curl http://localhost:4000/api/health`
+
+Production backend will refuse to start if required secrets are missing, if `JWT_SECRET` and `REFRESH_TOKEN_SECRET` are equal, if secrets are too short, or if production CORS/site URLs still point to `localhost`.
 
 ## Local Development (without Docker)
 
@@ -114,15 +137,13 @@ For production Docker deploys, also set:
 3. Start frontend:
    - `cd frontend && npm run dev`
 
-## Production Build
+## Production Ports
 
-- `docker compose -f docker-compose.prod.yml up --build -d`
-- Frontend served at http://localhost:8080
-- Backend served at http://localhost:4000
+- Frontend container is exposed on host port `8080`.
+- Backend container is exposed on host port `4000`.
+- PostgreSQL is not exposed publicly in `docker-compose.prod.yml`; it is available only inside the Docker network.
 
-Before the first production admin login, create a superadmin inside the production backend container:
-
-- `docker compose -f docker-compose.prod.yml exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-production-password'`
+Put a reverse proxy such as Nginx, Caddy, Traefik, or your hosting platform in front of these containers for HTTPS and public domains.
 
 ## API Summary
 
@@ -152,3 +173,4 @@ Before the first production admin login, create a superadmin inside the producti
 - Runtime data files are ignored by git. Back up the backend data volume in production.
 - Admin users and password hashes are stored in PostgreSQL. Back up the PostgreSQL volume in production.
 - Admin article HTML is sanitized before saving. Back up both the PostgreSQL volume and backend data volume in production.
+- Production Docker images do not include local `backend/data` files, `.env`, `node_modules`, `.next`, or TypeScript build cache.

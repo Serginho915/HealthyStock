@@ -3,6 +3,7 @@ import slugify from "slugify";
 import { Router } from "express";
 import { z } from "zod";
 import { AdminRequest, requireAdmin } from "../middleware/adminAuth.js";
+import { asyncHandler } from "../middleware/asyncHandler.js";
 import { logAuditEvent } from "../services/auditLog.js";
 import { getAdminSettings, updateAdminSettings } from "../services/adminSettings.js";
 import { createPost, deletePost, getAllPosts, updatePost } from "../services/postStore.js";
@@ -41,17 +42,17 @@ const settingsSchema = z.object({
 
 router.use(requireAdmin);
 
-router.get("/posts", async (_req, res) => {
+router.get("/posts", asyncHandler(async (_req, res) => {
   const posts = await getAllPosts();
   return res.json({ total: posts.length, items: posts });
-});
+}));
 
-router.get("/settings", async (_req, res) => {
+router.get("/settings", asyncHandler(async (_req, res) => {
   const settings = await getAdminSettings();
   return res.json(settings);
-});
+}));
 
-router.put("/settings", async (req: AdminRequest, res) => {
+router.put("/settings", asyncHandler(async (req: AdminRequest, res) => {
   const parsed = settingsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid settings payload", issues: parsed.error.flatten() });
@@ -64,9 +65,9 @@ router.put("/settings", async (req: AdminRequest, res) => {
     target: "generation-settings"
   });
   return res.json(settings);
-});
+}));
 
-router.post("/posts", async (req: AdminRequest, res) => {
+router.post("/posts", asyncHandler(async (req: AdminRequest, res) => {
   const parsed = postSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid post payload", issues: parsed.error.flatten() });
@@ -88,9 +89,9 @@ router.post("/posts", async (req: AdminRequest, res) => {
     details: { status: saved.status ?? "published" }
   });
   return res.status(201).json(saved);
-});
+}));
 
-router.put("/posts/:slug", async (req: AdminRequest, res) => {
+router.put("/posts/:slug", asyncHandler(async (req: AdminRequest, res) => {
   const parsed = postSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid post payload", issues: parsed.error.flatten() });
@@ -99,7 +100,7 @@ router.put("/posts/:slug", async (req: AdminRequest, res) => {
   const data = parsed.data;
   const post: BlogPost = {
     ...data,
-    id: req.body.id || randomUUID(),
+    id: randomUUID(),
     slug: slugify(data.slug || data.title, { lower: true, strict: true }),
     coverImage: data.coverImage || undefined
   };
@@ -112,9 +113,9 @@ router.put("/posts/:slug", async (req: AdminRequest, res) => {
     details: { previousSlug: req.params.slug, status: saved.status ?? "published" }
   });
   return res.json(saved);
-});
+}));
 
-router.delete("/posts/:slug", async (req: AdminRequest, res) => {
+router.delete("/posts/:slug", asyncHandler(async (req: AdminRequest, res) => {
   const deleted = await deletePost(req.params.slug);
   if (!deleted) {
     return res.status(404).json({ message: "Only generated or overridden posts can be deleted" });
@@ -126,6 +127,6 @@ router.delete("/posts/:slug", async (req: AdminRequest, res) => {
     target: req.params.slug
   });
   return res.json({ ok: true });
-});
+}));
 
 export default router;

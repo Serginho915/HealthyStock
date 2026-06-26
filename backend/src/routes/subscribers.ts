@@ -1,6 +1,7 @@
 import { Router } from "express";
 import nodemailer from "nodemailer";
 import { z } from "zod";
+import { asyncHandler } from "../middleware/asyncHandler.js";
 import { addSubscriber } from "../services/subscriberStore.js";
 
 const subscribeSchema = z.object({
@@ -9,6 +10,9 @@ const subscribeSchema = z.object({
 });
 
 const router = Router();
+const subscribeAttempts = new Map<string, { count: number; resetAt: number }>();
+const subscribeWindowMs = 60 * 60 * 1000;
+const maxSubscribeAttempts = 10;
 
 async function sendWelcomeEmail(email: string): Promise<void> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
@@ -38,7 +42,11 @@ async function sendWelcomeEmail(email: string): Promise<void> {
   });
 }
 
-router.post("/", async (req, res) => {
+router.post("/", asyncHandler(async (req, res) => {
+  if (isSubscriptionLimited(req.ip ?? "unknown")) {
+    return res.status(429).json({ message: "Too many subscription attempts. Try again later." });
+  }
+
   const parsed = subscribeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid payload" });
@@ -51,8 +59,23 @@ router.post("/", async (req, res) => {
     return res.status(200).json({ message: "Already subscribed" });
   }
 
-  await sendWelcomeEmail(email);
+  await sendWelcomeEmail(email).catch((error) => {
+    console.error("Failed to send welcome email", error);
+  });
   return res.status(201).json({ message: "Subscribed" });
-});
+}));
+
+function isSubscriptionLimited(ip: string): boolean {
+  const now = Date.now();
+  const current = subscribeAttempts.get(ip);
+
+  if (!current || current.resetAt <= now) {
+    subscribeAttempts.set(ip, { count: 1, resetAt: now + subscribeWindowMs });
+    return false;
+  }
+
+  current.count += 1;
+  return current.count > maxSubscribeAttempts;
+}
 
 export default router;

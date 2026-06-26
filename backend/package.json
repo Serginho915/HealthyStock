@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "create-superadmin": "node scripts/create-superadmin.mjs"
+    "create-superadmin": "node scripts/create-superadmin.mjs",
+    "generate-secrets": "node scripts/generate-secrets.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,7 +16,7 @@
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
-    "nodemailer": "^6.9.13",
+    "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
     "slugify": "^1.6.6",
     "zod": "^3.23.8"

@@ -12,6 +12,7 @@ import adminRouter from "./routes/admin.js";
 import { startGenerationScheduler } from "./services/generationScheduler.js";
 import { validateProductionAuthConfig } from "./services/auth.js";
 import { initDb } from "./services/db.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -24,7 +25,10 @@ if (process.env.TRUST_PROXY === "true") {
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000", "http://localhost:8080"],
+    origin: process.env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [
+      "http://localhost:3000",
+      "http://localhost:8080"
+    ],
     credentials: true
   })
 );
@@ -42,6 +46,7 @@ app.use("/api/ai", aiRouter);
 app.use("/api/health-index", healthIndexRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
+app.use(errorHandler);
 
 async function startServer() {
   await initDb();
