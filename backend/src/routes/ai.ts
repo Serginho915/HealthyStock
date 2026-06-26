@@ -1,0 +1,30 @@
+import { Router } from "express";
+import { z } from "zod";
+import { getAdminSettings } from "../services/adminSettings.js";
+import { generateArticle } from "../services/openrouter.js";
+import { createPostFromMarkdown, saveGeneratedPost } from "../services/postStore.js";
+
+const router = Router();
+
+const bodySchema = z.object({
+  topic: z.string().min(5).max(200)
+});
+
+router.post("/generate-article", async (req, res) => {
+  const parsed = bodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid topic" });
+  }
+
+  try {
+    const settings = await getAdminSettings();
+    const markdown = await generateArticle(parsed.data.topic, settings.masterPrompt);
+    const post = await saveGeneratedPost(createPostFromMarkdown(markdown, parsed.data.topic));
+    return res.status(201).json({ markdown, post });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Generation failed";
+    return res.status(500).json({ message });
+  }
+});
+
+export default router;

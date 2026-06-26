@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+.env
+.env.*
+!.env.example
+backend/data/subscribers.json
+backend/data/*.json
+backend/data/*.jsonl
+npm-debug.log*
+.DS_Store
+*.tsbuildinfo
