@@ -12,6 +12,7 @@ import adminRouter from "./routes/admin.js";
 import { startGenerationScheduler } from "./services/generationScheduler.js";
 import { validateProductionAuthConfig } from "./services/auth.js";
 import { initDb } from "./services/db.js";
+import { migrateLegacyDataIfNeeded } from "./services/legacyDataMigration.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -50,6 +51,7 @@ app.use(errorHandler);
 
 async function startServer() {
   await initDb();
+  await migrateLegacyDataIfNeeded();
 
   app.listen(port, () => {
     console.log(`HealthyStock backend listening on :${port}`);

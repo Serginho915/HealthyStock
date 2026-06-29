@@ -11,6 +11,11 @@ export function startGenerationScheduler() {
   }
 
   schedulerStarted = true;
+  runScheduledGeneration().catch((error) => {
+    const message = error instanceof Error ? error.message : "Scheduled generation failed";
+    patchGenerationStatus(`Failed: ${message}`).catch(() => undefined);
+  });
+
   setInterval(() => {
     runScheduledGeneration().catch((error) => {
       const message = error instanceof Error ? error.message : "Scheduled generation failed";
@@ -42,7 +47,10 @@ export async function runScheduledGeneration() {
 function isDue(settings: Awaited<ReturnType<typeof getAdminSettings>>): boolean {
   const now = new Date();
   const [hour, minute] = settings.generationTime.split(":").map(Number);
-  if (now.getHours() !== hour || now.getMinutes() !== minute) {
+  const scheduledAt = new Date(now);
+  scheduledAt.setHours(hour, minute, 0, 0);
+
+  if (now < scheduledAt) {
     return false;
   }
 

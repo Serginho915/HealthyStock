@@ -2,6 +2,7 @@ import { Router } from "express";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/asyncHandler.js";
+import { consumeRateLimit } from "../services/rateLimit.js";
 import { addSubscriber } from "../services/subscriberStore.js";
 
 const subscribeSchema = z.object({
@@ -10,9 +11,6 @@ const subscribeSchema = z.object({
 });
 
 const router = Router();
-const subscribeAttempts = new Map<string, { count: number; resetAt: number }>();
-const subscribeWindowMs = 60 * 60 * 1000;
-const maxSubscribeAttempts = 10;
 
 async function sendWelcomeEmail(email: string): Promise<void> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
@@ -43,7 +41,13 @@ async function sendWelcomeEmail(email: string): Promise<void> {
 }
 
 router.post("/", asyncHandler(async (req, res) => {
-  if (isSubscriptionLimited(req.ip ?? "unknown")) {
+  const limit = await consumeRateLimit(req.ip ?? "unknown", {
+    keyPrefix: "subscribe_ip",
+    points: 10,
+    durationSeconds: 60 * 60
+  });
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(Math.ceil(limit.msBeforeNext / 1000)));
     return res.status(429).json({ message: "Too many subscription attempts. Try again later." });
   }
 
@@ -64,18 +68,5 @@ router.post("/", asyncHandler(async (req, res) => {
   });
   return res.status(201).json({ message: "Subscribed" });
 }));
-
-function isSubscriptionLimited(ip: string): boolean {
-  const now = Date.now();
-  const current = subscribeAttempts.get(ip);
-
-  if (!current || current.resetAt <= now) {
-    subscribeAttempts.set(ip, { count: 1, resetAt: now + subscribeWindowMs });
-    return false;
-  }
-
-  current.count += 1;
-  return current.count > maxSubscribeAttempts;
-}
 
 export default router;

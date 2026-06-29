@@ -1,10 +1,10 @@
 import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { jwtVerify, SignJWT } from "jose";
+import { query } from "./db.js";
 
-const refreshTokensPath = path.resolve(process.cwd(), "data/refresh-tokens.json");
 const accessTokenTtlSeconds = 15 * 60;
-const refreshTokenTtlSeconds = 1000 * 60 * 60 * 24 * 14;
+const refreshTokenTtlMs = 1000 * 60 * 60 * 24 * 14;
+const csrfTokenTtlMs = 1000 * 60 * 60 * 12;
 const passwordHashIterations = 310_000;
 
 export interface AccessTokenPayload {
@@ -13,14 +13,16 @@ export interface AccessTokenPayload {
   exp: number;
 }
 
-interface RefreshTokenRecord {
-  tokenHash: string;
+interface RefreshTokenRow {
   subject: string;
-  expiresAt: string;
-  createdAt: string;
+}
+
+interface AccessTokenClaims {
+  role: "admin";
 }
 
 export const refreshCookieName = "hs_refresh_token";
+export const csrfCookieName = "hs_csrf_token";
 
 export function getAuthConfig() {
   const jwtSecret = process.env.JWT_SECRET;
@@ -41,6 +43,7 @@ export function validateProductionAuthConfig() {
   const config = getAuthConfig();
   const missing = [
     ["DATABASE_URL", process.env.DATABASE_URL],
+    ["REDIS_URL", process.env.REDIS_URL],
     ["CORS_ORIGIN", process.env.CORS_ORIGIN],
     ["JWT_SECRET", config.jwtSecret],
     ["REFRESH_TOKEN_SECRET", config.refreshSecret],
@@ -94,8 +97,42 @@ export function getRefreshCookieOptions() {
     secure: process.env.NODE_ENV === "production",
     domain,
     path: "/api/auth",
-    maxAge: refreshTokenTtlSeconds
+    maxAge: refreshTokenTtlMs
   } as const;
+}
+
+export function getCsrfCookieOptions() {
+  const sameSite = parseSameSite(process.env.REFRESH_COOKIE_SAMESITE);
+  const domain = process.env.REFRESH_COOKIE_DOMAIN || undefined;
+
+  return {
+    httpOnly: false,
+    sameSite,
+    secure: process.env.NODE_ENV === "production",
+    domain,
+    path: "/api/auth",
+    maxAge: csrfTokenTtlMs
+  } as const;
+}
+
+export function createCsrfToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function isCsrfTokenValid(cookieHeader: string, headerToken: string | undefined): boolean {
+  if (!headerToken) {
+    return false;
+  }
+
+  const cookieToken = readCookieValue(cookieHeader, csrfCookieName);
+  return Boolean(cookieToken && safeEqual(cookieToken, headerToken));
+}
+
+export function readCookieValue(header: string, name: string): string | undefined {
+  const cookies = header.split(";").map((item) => item.trim());
+  const prefix = `${name}=`;
+  const cookie = cookies.find((item) => item.startsWith(prefix));
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : undefined;
 }
 
 export function createPasswordHash(password: string): string {
@@ -104,46 +141,40 @@ export function createPasswordHash(password: string): string {
   return `pbkdf2-sha512$${passwordHashIterations}$${salt}$${hash}`;
 }
 
-export function createAccessToken(subject: string): string {
+export async function createAccessToken(subject: string): Promise<string> {
   const config = getAuthConfig();
   if (!config.jwtSecret) {
     throw new Error("JWT_SECRET is not set");
   }
 
-  const payload: AccessTokenPayload = {
-    sub: subject,
-    role: "admin",
-    exp: Math.floor(Date.now() / 1000) + accessTokenTtlSeconds
-  };
-
-  const header = encodeBase64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = encodeBase64Url(JSON.stringify(payload));
-  const signature = sign(`${header}.${body}`, config.jwtSecret);
-  return `${header}.${body}.${signature}`;
+  return new SignJWT({ role: "admin" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(subject)
+    .setIssuedAt()
+    .setExpirationTime(`${accessTokenTtlSeconds}s`)
+    .sign(getJwtSecretBytes(config.jwtSecret));
 }
 
-export function verifyAccessToken(token: string): AccessTokenPayload | null {
+export async function verifyAccessToken(token: string): Promise<AccessTokenPayload | null> {
   const config = getAuthConfig();
   if (!config.jwtSecret) {
     return null;
   }
 
-  const [header, body, signature] = token.split(".");
-  if (!header || !body || !signature) {
-    return null;
-  }
-
-  const expected = sign(`${header}.${body}`, config.jwtSecret);
-  if (!safeEqual(signature, expected)) {
-    return null;
-  }
-
   try {
-    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf-8")) as AccessTokenPayload;
-    if (payload.role !== "admin" || payload.exp < Math.floor(Date.now() / 1000)) {
+    const verified = await jwtVerify<AccessTokenClaims>(token, getJwtSecretBytes(config.jwtSecret), {
+      algorithms: ["HS256"]
+    });
+
+    if (verified.payload.role !== "admin" || typeof verified.payload.sub !== "string") {
       return null;
     }
-    return payload;
+
+    return {
+      sub: verified.payload.sub,
+      role: "admin",
+      exp: Number(verified.payload.exp ?? 0)
+    };
   } catch {
     return null;
   }
@@ -151,17 +182,13 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
 
 export async function createRefreshToken(subject: string): Promise<string> {
   const token = randomBytes(48).toString("base64url");
-  const records = await readRefreshTokens();
-  const now = new Date();
+  await query(
+    `INSERT INTO refresh_tokens (token_hash, subject, created_at, expires_at)
+     VALUES ($1, $2, NOW(), NOW() + INTERVAL '14 days')`,
+    [hashRefreshToken(token), subject]
+  );
 
-  records.push({
-    tokenHash: hashRefreshToken(token),
-    subject,
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + refreshTokenTtlSeconds).toISOString()
-  });
-
-  await writeRefreshTokens(pruneExpired(records));
+  await query(`DELETE FROM refresh_tokens WHERE expires_at <= NOW()`);
   return token;
 }
 
@@ -170,35 +197,30 @@ export async function rotateRefreshToken(
   validateSubject: (subject: string) => Promise<boolean> = async () => true
 ): Promise<{ accessToken: string; refreshToken: string } | null> {
   const tokenHash = hashRefreshToken(token);
-  const records = pruneExpired(await readRefreshTokens());
-  const record = records.find((item) => safeEqual(item.tokenHash, tokenHash));
+  const rotated = await query<RefreshTokenRow>(
+    `DELETE FROM refresh_tokens
+     WHERE token_hash = $1 AND expires_at > NOW()
+     RETURNING subject`,
+    [tokenHash]
+  );
 
+  const record = rotated[0];
   if (!record) {
-    await writeRefreshTokens(records);
     return null;
   }
 
   if (!(await validateSubject(record.subject))) {
-    await writeRefreshTokens(records.filter((item) => !safeEqual(item.tokenHash, tokenHash)));
     return null;
   }
 
-  const nextRecords = records.filter((item) => !safeEqual(item.tokenHash, tokenHash));
-  await writeRefreshTokens(nextRecords);
-
-  const accessToken = createAccessToken(record.subject);
+  const accessToken = await createAccessToken(record.subject);
   const refreshToken = await createRefreshToken(record.subject);
   return { accessToken, refreshToken };
 }
 
 export async function revokeRefreshToken(token: string): Promise<void> {
   const tokenHash = hashRefreshToken(token);
-  const records = await readRefreshTokens();
-  await writeRefreshTokens(records.filter((item) => !safeEqual(item.tokenHash, tokenHash)));
-}
-
-function sign(value: string, secret: string): string {
-  return createHmac("sha256", secret).update(value).digest("base64url");
+  await query(`DELETE FROM refresh_tokens WHERE token_hash = $1`, [tokenHash]);
 }
 
 function hashRefreshToken(token: string): string {
@@ -206,8 +228,8 @@ function hashRefreshToken(token: string): string {
   return createHmac("sha256", secret).update(token).digest("hex");
 }
 
-function encodeBase64Url(value: string): string {
-  return Buffer.from(value).toString("base64url");
+function getJwtSecretBytes(secret: string) {
+  return new TextEncoder().encode(secret);
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -234,23 +256,4 @@ function parseSameSite(value: string | undefined): "lax" | "strict" | "none" {
   }
 
   return "lax";
-}
-
-async function readRefreshTokens(): Promise<RefreshTokenRecord[]> {
-  try {
-    const data = await fs.readFile(refreshTokensPath, "utf-8");
-    return JSON.parse(data) as RefreshTokenRecord[];
-  } catch {
-    return [];
-  }
-}
-
-async function writeRefreshTokens(records: RefreshTokenRecord[]) {
-  await fs.mkdir(path.dirname(refreshTokensPath), { recursive: true });
-  await fs.writeFile(refreshTokensPath, JSON.stringify(records, null, 2), "utf-8");
-}
-
-function pruneExpired(records: RefreshTokenRecord[]) {
-  const now = Date.now();
-  return records.filter((record) => new Date(record.expiresAt).getTime() > now);
 }

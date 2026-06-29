@@ -1,25 +1,78 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import slugify from "slugify";
 import { samplePosts } from "../data/samplePosts.js";
 import { BlogPost } from "../types.js";
+import { query } from "./db.js";
 import { sanitizeHtml } from "./htmlSanitizer.js";
 
-const generatedPostsPath = path.resolve(process.cwd(), "data/generated-posts.json");
-
-async function readGeneratedPosts(): Promise<BlogPost[]> {
-  try {
-    const data = await fs.readFile(generatedPostsPath, "utf-8");
-    return JSON.parse(data) as BlogPost[];
-  } catch {
-    return [];
-  }
+interface GeneratedPostRow {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  cover_image: string | null;
+  author: string;
+  published_at: string;
+  read_time_minutes: number;
+  primary_keyword: string;
+  secondary_keywords: string[];
+  category: string;
+  rating: BlogPost["rating"];
+  status: NonNullable<BlogPost["status"]>;
 }
 
-async function writeGeneratedPosts(posts: BlogPost[]) {
-  await fs.mkdir(path.dirname(generatedPostsPath), { recursive: true });
-  await fs.writeFile(generatedPostsPath, JSON.stringify(posts, null, 2), "utf-8");
+async function readGeneratedPosts(): Promise<BlogPost[]> {
+  const rows = await query<GeneratedPostRow>(
+    `SELECT id, title, slug, excerpt, content, cover_image, author, published_at,
+            read_time_minutes, primary_keyword, secondary_keywords, category, rating, status
+     FROM generated_posts
+     ORDER BY published_at DESC, updated_at DESC`
+  );
+
+  return rows.map(mapGeneratedPost);
+}
+
+async function upsertGeneratedPost(post: BlogPost) {
+  await query(
+    `INSERT INTO generated_posts (
+      id, title, slug, excerpt, content, cover_image, author, published_at,
+      read_time_minutes, primary_keyword, secondary_keywords, category, rating, status, updated_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9, $10, $11, $12, $13, $14, NOW())
+    ON CONFLICT (slug)
+    DO UPDATE SET
+      id = EXCLUDED.id,
+      title = EXCLUDED.title,
+      excerpt = EXCLUDED.excerpt,
+      content = EXCLUDED.content,
+      cover_image = EXCLUDED.cover_image,
+      author = EXCLUDED.author,
+      published_at = EXCLUDED.published_at,
+      read_time_minutes = EXCLUDED.read_time_minutes,
+      primary_keyword = EXCLUDED.primary_keyword,
+      secondary_keywords = EXCLUDED.secondary_keywords,
+      category = EXCLUDED.category,
+      rating = EXCLUDED.rating,
+      status = EXCLUDED.status,
+      updated_at = NOW()`,
+    [
+      post.id,
+      post.title,
+      post.slug,
+      post.excerpt,
+      post.content,
+      post.coverImage ?? null,
+      post.author,
+      post.publishedAt,
+      post.readTimeMinutes,
+      post.primaryKeyword,
+      post.secondaryKeywords,
+      post.category,
+      post.rating,
+      post.status ?? "published"
+    ]
+  );
 }
 
 export async function getAllPosts(): Promise<BlogPost[]> {
@@ -45,7 +98,6 @@ export async function getAdminPostBySlug(slug: string): Promise<BlogPost | undef
 }
 
 export async function saveGeneratedPost(post: BlogPost): Promise<BlogPost> {
-  const generatedPosts = await readGeneratedPosts();
   const allSlugs = new Set((await getAllPosts()).map((item) => item.slug));
   const baseSlug = post.slug;
   let slug = baseSlug;
@@ -57,7 +109,7 @@ export async function saveGeneratedPost(post: BlogPost): Promise<BlogPost> {
   }
 
   const savedPost = normalizePost({ ...post, slug });
-  await writeGeneratedPosts([savedPost, ...generatedPosts]);
+  await upsertGeneratedPost(savedPost);
   return savedPost;
 }
 
@@ -67,14 +119,13 @@ export async function createPost(post: BlogPost): Promise<BlogPost> {
 
 export async function updatePost(currentSlug: string, post: BlogPost): Promise<BlogPost> {
   const generatedPosts = await readGeneratedPosts();
-  const withoutCurrent = generatedPosts.filter((item) => item.slug !== currentSlug);
   const samplePost = samplePosts.find((item) => item.slug === currentSlug);
   const existing = generatedPosts.find((item) => item.slug === currentSlug) ?? samplePost;
 
   const postId = existing?.id ?? post.id;
   const desiredSlug = post.slug;
   const usedSlugs = new Set([
-    ...withoutCurrent.map((item) => item.slug),
+    ...generatedPosts.filter((item) => item.slug !== currentSlug).map((item) => item.slug),
     ...samplePosts.filter((item) => item.slug !== currentSlug).map((item) => item.slug)
   ]);
 
@@ -86,19 +137,22 @@ export async function updatePost(currentSlug: string, post: BlogPost): Promise<B
   }
 
   const savedPost = normalizePost({ ...post, id: postId, slug });
-  await writeGeneratedPosts([savedPost, ...withoutCurrent]);
+  if (currentSlug !== savedPost.slug) {
+    await query(`DELETE FROM generated_posts WHERE slug = $1`, [currentSlug]);
+  }
+  await upsertGeneratedPost(savedPost);
   return savedPost;
 }
 
 export async function deletePost(slug: string): Promise<boolean> {
-  const generatedPosts = await readGeneratedPosts();
-  const nextPosts = generatedPosts.filter((post) => post.slug !== slug);
-  if (nextPosts.length === generatedPosts.length) {
-    return false;
-  }
+  const deleted = await query<{ slug: string }>(
+    `DELETE FROM generated_posts
+     WHERE slug = $1
+     RETURNING slug`,
+    [slug]
+  );
 
-  await writeGeneratedPosts(nextPosts);
-  return true;
+  return deleted.length > 0;
 }
 
 export function createPostFromMarkdown(markdown: string, topic: string): BlogPost {
@@ -305,4 +359,23 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function mapGeneratedPost(row: GeneratedPostRow): BlogPost {
+  return {
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    excerpt: row.excerpt,
+    content: row.content,
+    coverImage: row.cover_image ?? undefined,
+    author: row.author,
+    publishedAt: row.published_at,
+    readTimeMinutes: row.read_time_minutes,
+    primaryKeyword: row.primary_keyword,
+    secondaryKeywords: row.secondary_keywords,
+    category: row.category,
+    rating: row.rating,
+    status: row.status
+  };
 }

@@ -54,12 +54,31 @@ export function AdminPanel() {
     [posts]
   );
 
+  function getCookie(name: string): string | null {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const prefix = `${name}=`;
+    const cookie = document.cookie
+      .split(";")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(prefix));
+
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+  }
+
   async function request<T>(path: string, init: RequestInit = {}, token = accessToken): Promise<T> {
+    const csrfToken = path === "/api/auth/refresh" || path === "/api/auth/logout"
+      ? getCookie("hs_csrf_token")
+      : null;
+
     const res = await fetch(`${apiUrl}${path}`, {
       ...init,
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init.headers
       }

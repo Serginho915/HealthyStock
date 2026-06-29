@@ -25,8 +25,8 @@ router.post("/generate-article", async (req, res) => {
     const post = await saveGeneratedPost(createPostFromMarkdown(markdown, parsed.data.topic));
     return res.status(201).json({ markdown, post });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Generation failed";
-    return res.status(500).json({ message });
+    console.error("Failed to generate article", error);
+    return res.status(502).json({ message: "Generation failed" });
   }
 });
 

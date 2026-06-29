@@ -1,8 +1,5 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { DEFAULT_MASTER_PROMPT } from "./openrouter.js";
-
-const settingsPath = path.resolve(process.cwd(), "data/admin-settings.json");
+import { query } from "./db.js";
 
 export type GenerationFrequency = "manual" | "daily" | "weekly" | "monthly";
 
@@ -24,19 +21,72 @@ export const defaultAdminSettings: AdminSettings = {
   generationFrequency: "manual"
 };
 
+interface AdminSettingsRow {
+  master_prompt: string;
+  auto_generation_enabled: boolean;
+  generation_topic: string;
+  generation_time: string;
+  generation_frequency: GenerationFrequency;
+  last_generated_at: string | null;
+  last_generation_status: string | null;
+}
+
 export async function getAdminSettings(): Promise<AdminSettings> {
-  try {
-    const data = JSON.parse(await fs.readFile(settingsPath, "utf-8")) as Partial<AdminSettings>;
-    return normalizeSettings(data);
-  } catch {
+  const rows = await query<AdminSettingsRow>(
+    `SELECT master_prompt, auto_generation_enabled, generation_topic, generation_time,
+            generation_frequency, last_generated_at, last_generation_status
+     FROM admin_settings
+     WHERE id = 1
+     LIMIT 1`
+  );
+
+  if (!rows[0]) {
     return defaultAdminSettings;
   }
+
+  return normalizeSettings({
+    masterPrompt: rows[0].master_prompt,
+    autoGenerationEnabled: rows[0].auto_generation_enabled,
+    generationTopic: rows[0].generation_topic,
+    generationTime: rows[0].generation_time,
+    generationFrequency: rows[0].generation_frequency,
+    lastGeneratedAt: rows[0].last_generated_at ?? undefined,
+    lastGenerationStatus: rows[0].last_generation_status ?? undefined
+  });
 }
 
 export async function updateAdminSettings(nextSettings: AdminSettings): Promise<AdminSettings> {
   const settings = normalizeSettings(nextSettings);
-  await fs.mkdir(path.dirname(settingsPath), { recursive: true });
-  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+
+  await query(
+    `INSERT INTO admin_settings (
+      id, master_prompt, auto_generation_enabled, generation_topic,
+      generation_time, generation_frequency, last_generated_at,
+      last_generation_status, updated_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+    ON CONFLICT (id)
+    DO UPDATE SET
+      master_prompt = EXCLUDED.master_prompt,
+      auto_generation_enabled = EXCLUDED.auto_generation_enabled,
+      generation_topic = EXCLUDED.generation_topic,
+      generation_time = EXCLUDED.generation_time,
+      generation_frequency = EXCLUDED.generation_frequency,
+      last_generated_at = EXCLUDED.last_generated_at,
+      last_generation_status = EXCLUDED.last_generation_status,
+      updated_at = NOW()`,
+    [
+      1,
+      settings.masterPrompt,
+      settings.autoGenerationEnabled,
+      settings.generationTopic,
+      settings.generationTime,
+      settings.generationFrequency,
+      settings.lastGeneratedAt ?? null,
+      settings.lastGenerationStatus ?? null
+    ]
+  );
+
   return settings;
 }
 
