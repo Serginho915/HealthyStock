@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "..");
-const rootEnvPath = path.join(rootDir, ".env");
+const rootEnvPath = path.join(rootDir, ".env.production");
 const rootExamplePath = path.join(rootDir, ".env.production.example");
-const backendEnvPath = path.join(rootDir, "backend/.env");
+const backendEnvPath = path.join(rootDir, "backend/.env.production");
 const backendExamplePath = path.join(rootDir, "backend/.env.production.example");
 
 const generated = {
@@ -23,11 +23,13 @@ const rootEnv = await upsertEnvFile(rootExamplePath, rootEnvPath, {
 const postgresUser = rootEnv.POSTGRES_USER || "healthystock";
 const postgresDb = rootEnv.POSTGRES_DB || "healthystock";
 const postgresPassword = rootEnv.POSTGRES_PASSWORD || generated.POSTGRES_PASSWORD;
+const dockerDatabaseUrl = `postgres://${postgresUser}:${postgresPassword}@postgres:5432/${postgresDb}`;
 
 await upsertEnvFile(backendExamplePath, backendEnvPath, {
-  DATABASE_URL: `postgres://${postgresUser}:${postgresPassword}@postgres:5432/${postgresDb}`,
   JWT_SECRET: generated.JWT_SECRET,
   REFRESH_TOKEN_SECRET: generated.REFRESH_TOKEN_SECRET
+}, {
+  DATABASE_URL: dockerDatabaseUrl
 });
 
 console.log("Production env setup complete.");
@@ -40,6 +42,7 @@ console.log("Generated values only when missing or still set to placeholders:");
 console.log("- POSTGRES_PASSWORD");
 console.log("- JWT_SECRET");
 console.log("- REFRESH_TOKEN_SECRET");
+console.log("- DATABASE_URL is synchronized from POSTGRES_* values");
 console.log("");
 console.log("Review and replace placeholders before deploying:");
 console.log("- NEXT_PUBLIC_API_URL");
@@ -47,9 +50,10 @@ console.log("- NEXT_PUBLIC_SITE_URL");
 console.log("- CORS_ORIGIN");
 console.log("- OPENROUTER_API_KEY");
 console.log("- OPENROUTER_SITE_URL");
+console.log("- OPENROUTER_* tuning values if needed");
 console.log("- SMTP_* if email delivery is needed");
 
-async function upsertEnvFile(examplePath, targetPath, generatedValues) {
+async function upsertEnvFile(examplePath, targetPath, generatedValues, forcedValues = {}) {
   const example = await fs.readFile(examplePath, "utf-8");
   const existing = await readOptional(targetPath);
   const existingValues = parseEnv(existing);
@@ -59,6 +63,10 @@ async function upsertEnvFile(examplePath, targetPath, generatedValues) {
     if (shouldGenerate(nextValues[key])) {
       nextValues[key] = value;
     }
+  }
+
+  for (const [key, value] of Object.entries(forcedValues)) {
+    nextValues[key] = value;
   }
 
   const output = renderEnv(example, nextValues);

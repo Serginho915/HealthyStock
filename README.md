@@ -86,7 +86,7 @@ This only logs admins out. It does not delete users from PostgreSQL.
 
 ## Production Secrets
 
-Set stable, strong secrets in `backend/.env` or your hosting secret manager:
+Set stable, strong secrets in `backend/.env.production` or your hosting secret manager:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
@@ -110,22 +110,24 @@ For production Docker deploys, also set:
    - `npm run setup:prod-env`
    - the script keeps existing non-placeholder values and only generates missing placeholder secrets
 2. Review generated files:
-   - root `.env`
-   - `backend/.env`
+   - root `.env.production`
+   - `backend/.env.production`
 3. Replace placeholders:
-   - root `.env`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`
-   - `backend/.env`: `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, SMTP values if needed
+   - root `.env.production`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`
+   - `backend/.env.production`: `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, SMTP values if needed
    - optional OpenRouter tuning is available through `OPENROUTER_TIMEOUT_MS`, `OPENROUTER_MAX_INPUT_CHARS`, `OPENROUTER_MAX_OUTPUT_TOKENS`, and `OPENROUTER_TEMPERATURE`
+   - root `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` are used by Docker Compose
+   - backend `DATABASE_URL` is generated from the same root `POSTGRES_*` values, so Docker and backend stay aligned
    - generated `POSTGRES_PASSWORD`, `JWT_SECRET`, and `REFRESH_TOKEN_SECRET` should stay stable and should not be regenerated on every deploy
 4. Build and start:
-   - `docker compose -f docker-compose.prod.yml up --build -d`
+   - `docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d`
 5. Create the first superadmin:
    - safer shell-history friendly form:
-     - `SUPERADMIN_PASSWORD='your-strong-production-password' docker compose -f docker-compose.prod.yml exec -e SUPERADMIN_PASSWORD backend npm run create-superadmin -- admin@yourdomain.com`
+     - `SUPERADMIN_PASSWORD='your-strong-production-password' docker compose --env-file .env.production -f docker-compose.prod.yml exec -e SUPERADMIN_PASSWORD backend npm run create-superadmin -- admin@yourdomain.com`
    - direct form:
-     - `docker compose -f docker-compose.prod.yml exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-production-password'`
+     - `docker compose --env-file .env.production -f docker-compose.prod.yml exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-production-password'`
 6. Verify:
-   - `docker compose -f docker-compose.prod.yml ps`
+   - `docker compose --env-file .env.production -f docker-compose.prod.yml ps`
    - `curl http://localhost:4000/api/health`
 
 Production backend will refuse to start if required secrets are missing, if `JWT_SECRET` and `REFRESH_TOKEN_SECRET` are equal, if secrets are too short, or if production CORS/site URLs still point to `localhost`.
@@ -157,7 +159,7 @@ An Nginx starting point is available in `nginx.sample`. It proxies `/api/` to ba
 - `GET /api/posts/:slug`
 - `GET /api/posts/search?q=...`
 - `POST /api/subscribe` with `{ "email": "..." }`
-- `POST /api/ai/generate-article` with `{ "topic": "..." }`
+- `POST /api/ai/generate-article` with `{ "topic": "..." }` - admin access token required
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`

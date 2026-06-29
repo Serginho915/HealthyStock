@@ -20,7 +20,7 @@ services:
       context: ./backend
       target: prod
     env_file:
-      - path: ./backend/.env
+      - path: ./backend/.env.production
         format: raw
     environment:
       NODE_ENV: production

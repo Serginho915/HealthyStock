@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
+import { requireAdmin } from "../middleware/adminAuth.js";
 import { getAdminSettings } from "../services/adminSettings.js";
 import { generateArticle } from "../services/openrouter.js";
 import { createPostFromMarkdown, saveGeneratedPost } from "../services/postStore.js";
 
 const router = Router();
+
+router.use(requireAdmin);
 
 const bodySchema = z.object({
   topic: z.string().min(5).max(200)
