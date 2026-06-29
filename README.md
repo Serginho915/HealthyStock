@@ -42,9 +42,12 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
    - SMTP can stay empty locally unless you want to test email subscriptions.
 3. Run:
    - `docker compose up -d --build`
-   - Docker development uses built images plus named volumes, not live source-code mounts. After changing backend or frontend code, rebuild the affected service with `docker compose up --build -d backend frontend`.
-4. Create the first superadmin:
-   - `docker compose exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-password-here'`
+   - Docker development uses built images, not live source-code mounts. After changing backend or frontend code, rebuild the affected service with `docker compose up --build -d backend frontend`.
+   - Dev and production use separate image names. Local development keeps the existing `healthystock_postgres_data` volume so generated articles survive rebuilds.
+4. The local superadmin is created automatically by the `admin-seed` service:
+   - Email: `admin@healthystock.local`
+   - Password: `MySecretPassword123!`
+   - Override these with `LOCAL_SUPERADMIN_EMAIL` and `LOCAL_SUPERADMIN_PASSWORD` before running Docker Compose if needed.
 5. Open:
    - Frontend: http://localhost:3000
    - Backend: http://localhost:4000/api/health
@@ -57,6 +60,7 @@ Admin accounts are stored in PostgreSQL. The database stores only `password_hash
 With Docker:
 
 - `docker compose exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-password-here'`
+- For local Docker, `admin-seed` also runs automatically on `docker compose up -d --build` and upserts `admin@healthystock.local`.
 
 Without Docker, point `DATABASE_URL` to PostgreSQL first, then run:
 
@@ -80,8 +84,7 @@ If this happened after switching from the old env-based auth to DB auth, the bro
 You can also clear stored refresh tokens locally:
 
 - stop the backend or make sure nobody is logged in
-- Docker: `docker compose exec backend rm -f /app/data/refresh-tokens.json`
-- without Docker: delete `backend/data/refresh-tokens.json`
+- Docker/PostgreSQL: `docker compose exec postgres psql -U healthystock -d healthystock -c "delete from refresh_tokens;"`
 - restart backend: `docker compose restart backend`
 
 This only logs admins out. It does not delete users from PostgreSQL.
@@ -175,13 +178,8 @@ An Nginx starting point is available in `nginx.sample`. It proxies `/api/` to ba
 ## Notes
 
 - Set `NEXT_PUBLIC_SITE_URL`, `CORS_ORIGIN`, and cookie domain settings when deploying to a real domain.
-- In Docker, generated/admin-edited posts, admin settings, refresh sessions, and audit logs are stored in the backend data volume at `/app/data`.
-- Without Docker, those files are stored under `backend/data`.
-- Generated/admin-edited posts use `generated-posts.json`.
-- Admin settings use `admin-settings.json`.
-- Refresh sessions use `refresh-tokens.json`.
-- Audit events use `audit-log.jsonl`.
-- Runtime data files are ignored by git. Back up the backend data volume in production.
-- Admin users and password hashes are stored in PostgreSQL. Back up the PostgreSQL volume in production.
-- Admin article HTML is sanitized before saving. Back up both the PostgreSQL volume and backend data volume in production.
+- Generated/admin-edited posts, admin settings, refresh sessions, subscribers, audit events, admin users, and password hashes are stored in PostgreSQL.
+- Legacy JSON files under `backend/data` are only used for one-time migration into PostgreSQL when the corresponding database table is empty.
+- Runtime data files are ignored by git. Back up the PostgreSQL volume in production.
+- Admin article HTML is sanitized before saving.
 - Production Docker images do not include local `backend/data` files, `.env`, `node_modules`, `.next`, or TypeScript build cache.

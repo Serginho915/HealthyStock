@@ -27,6 +27,7 @@ services:
       retries: 12
 
   backend:
+    image: healthystock-backend-dev
     build:
       context: ./backend
       target: dev
@@ -36,9 +37,6 @@ services:
     environment:
       DATABASE_URL: postgres://healthystock:healthystock@postgres:5432/healthystock
       REDIS_URL: redis://redis:6379
-    volumes:
-      - backend_node_modules:/app/node_modules
-      - backend_data:/app/data
     ports:
       - "4000:4000"
     depends_on:
@@ -57,7 +55,23 @@ services:
       retries: 12
       start_period: 5s
 
+  admin-seed:
+    image: healthystock-backend-dev
+    env_file:
+      - path: ./backend/.env
+        format: raw
+    environment:
+      DATABASE_URL: postgres://healthystock:healthystock@postgres:5432/healthystock
+      SUPERADMIN_PASSWORD: ${LOCAL_SUPERADMIN_PASSWORD:-MySecretPassword123!}
+    command: ["npm", "run", "create-superadmin", "--", "${LOCAL_SUPERADMIN_EMAIL:-admin@healthystock.local}"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   frontend:
+    image: healthystock-frontend-dev
     build:
       context: ./frontend
       target: dev
@@ -66,9 +80,6 @@ services:
     environment:
       API_URL: http://backend:4000
       NEXT_PUBLIC_API_URL: http://localhost:4000
-    volumes:
-      - frontend_node_modules:/app/node_modules
-      - frontend_next:/app/.next
     ports:
       - "3000:3000"
     depends_on:
@@ -77,7 +88,4 @@ services:
 
 volumes:
   postgres_data:
-  backend_node_modules:
-  backend_data:
-  frontend_node_modules:
-  frontend_next:
+    name: healthystock_postgres_data

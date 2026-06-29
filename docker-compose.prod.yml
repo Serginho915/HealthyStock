@@ -25,6 +25,7 @@ services:
       retries: 12
 
   backend:
+    image: healthystock-backend-prod
     restart: unless-stopped
     build:
       context: ./backend
@@ -55,6 +56,7 @@ services:
       start_period: 10s
 
   frontend:
+    image: healthystock-frontend-prod
     restart: unless-stopped
     build:
       context: ./frontend
@@ -74,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+    name: healthystock_prod_postgres_data
