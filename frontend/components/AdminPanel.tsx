@@ -85,8 +85,13 @@ export function AdminPanel() {
     });
 
     if (res.status === 401 && path !== "/api/auth/refresh") {
-      const nextToken = await refreshAccessToken();
-      return request<T>(path, init, nextToken);
+      try {
+        const nextToken = await refreshAccessToken();
+        return request<T>(path, init, nextToken);
+      } catch {
+        setAccessToken("");
+        throw new Error("Session expired. Sign in again.");
+      }
     }
 
     const data = (await res.json()) as T & { message?: string };
@@ -98,9 +103,14 @@ export function AdminPanel() {
   }
 
   async function refreshAccessToken() {
-    const data = await request<{ accessToken: string }>("/api/auth/refresh", { method: "POST" }, "");
-    setAccessToken(data.accessToken);
-    return data.accessToken;
+    try {
+      const data = await request<{ accessToken: string }>("/api/auth/refresh", { method: "POST" }, "");
+      setAccessToken(data.accessToken);
+      return data.accessToken;
+    } catch (error) {
+      setAccessToken("");
+      throw error;
+    }
   }
 
   async function loadPosts(token = accessToken) {
@@ -211,6 +221,10 @@ export function AdminPanel() {
 
   async function saveSettings(event: FormEvent) {
     event.preventDefault();
+    await saveCurrentSettings();
+  }
+
+  async function saveCurrentSettings() {
     if (!settings) {
       return;
     }
@@ -227,6 +241,37 @@ export function AdminPanel() {
       setStatus("Generation settings saved");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Settings save failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateNow() {
+    if (!settings) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus("Generating article...");
+
+    try {
+      const savedSettings = await request<AdminSettings>("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings)
+      });
+      setSettings(savedSettings);
+
+      const generated = await request<{ post: BlogPost }>("/api/ai/generate-article", {
+        method: "POST",
+        body: JSON.stringify({ topic: savedSettings.generationTopic })
+      });
+
+      await Promise.all([loadPosts(), loadSettings()]);
+      selectPost(generated.post);
+      setActivePanel("articles");
+      setStatus(`Generated article: ${generated.post.title}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Generation failed");
     } finally {
       setLoading(false);
     }
@@ -491,6 +536,14 @@ export function AdminPanel() {
           <footer className="admin-actions">
             <button type="submit" disabled={loading}>
               {loading ? "Saving..." : "Save generation settings"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={loading || settings.generationTopic.trim().length < 5}
+              onClick={generateNow}
+            >
+              {loading ? "Working..." : "Generate now"}
             </button>
             {status ? <p className="status">{status}</p> : null}
           </footer>

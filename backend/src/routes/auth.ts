@@ -71,7 +71,9 @@ router.post("/login", asyncHandler(async (req, res) => {
 
 router.post("/refresh", asyncHandler(async (req, res) => {
   if (!isCsrfTokenValid(req.header("cookie") ?? "", req.header("x-csrf-token") ?? undefined)) {
-    return res.status(403).json({ message: "Invalid CSRF token" });
+    clearRefreshCookie(res);
+    clearCsrfCookie(res);
+    return res.status(401).json({ message: "Session expired. Sign in again." });
   }
 
   const refreshToken = readCookieValue(req.header("cookie") ?? "", refreshCookieName);
@@ -93,7 +95,9 @@ router.post("/refresh", asyncHandler(async (req, res) => {
 
 router.post("/logout", asyncHandler(async (req, res) => {
   if (!isCsrfTokenValid(req.header("cookie") ?? "", req.header("x-csrf-token") ?? undefined)) {
-    return res.status(403).json({ message: "Invalid CSRF token" });
+    clearRefreshCookie(res);
+    clearCsrfCookie(res);
+    return res.json({ ok: true });
   }
 
   const refreshToken = readCookieValue(req.header("cookie") ?? "", refreshCookieName);

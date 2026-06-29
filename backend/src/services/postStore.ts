@@ -13,7 +13,7 @@ interface GeneratedPostRow {
   content: string;
   cover_image: string | null;
   author: string;
-  published_at: string;
+  published_at: string | Date;
   read_time_minutes: number;
   primary_keyword: string;
   secondary_keywords: string[];
@@ -370,7 +370,7 @@ function mapGeneratedPost(row: GeneratedPostRow): BlogPost {
     content: row.content,
     coverImage: row.cover_image ?? undefined,
     author: row.author,
-    publishedAt: row.published_at,
+    publishedAt: formatDateOnly(row.published_at),
     readTimeMinutes: row.read_time_minutes,
     primaryKeyword: row.primary_keyword,
     secondaryKeywords: row.secondary_keywords,
@@ -378,4 +378,12 @@ function mapGeneratedPost(row: GeneratedPostRow): BlogPost {
     rating: row.rating,
     status: row.status
   };
+}
+
+function formatDateOnly(value: string | Date): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return value.slice(0, 10);
 }

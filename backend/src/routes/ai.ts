@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAdmin } from "../middleware/adminAuth.js";
-import { getAdminSettings } from "../services/adminSettings.js";
+import { getAdminSettings, patchGenerationStatus } from "../services/adminSettings.js";
 import { generateArticle } from "../services/openrouter.js";
 import { createPostFromMarkdown, saveGeneratedPost } from "../services/postStore.js";
 
@@ -23,6 +23,7 @@ router.post("/generate-article", async (req, res) => {
     const settings = await getAdminSettings();
     const markdown = await generateArticle(parsed.data.topic, settings.masterPrompt);
     const post = await saveGeneratedPost(createPostFromMarkdown(markdown, parsed.data.topic));
+    await patchGenerationStatus(`Generated manually: ${post.title}`, new Date().toISOString());
     return res.status(201).json({ markdown, post });
   } catch (error) {
     console.error("Failed to generate article", error);
