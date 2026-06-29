@@ -115,6 +115,7 @@ For production Docker deploys, also set:
 3. Replace placeholders:
    - root `.env`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`
    - `backend/.env`: `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, SMTP values if needed
+   - optional OpenRouter tuning is available through `OPENROUTER_TIMEOUT_MS`, `OPENROUTER_MAX_INPUT_CHARS`, `OPENROUTER_MAX_OUTPUT_TOKENS`, and `OPENROUTER_TEMPERATURE`
    - generated `POSTGRES_PASSWORD`, `JWT_SECRET`, and `REFRESH_TOKEN_SECRET` should stay stable and should not be regenerated on every deploy
 4. Build and start:
    - `docker compose -f docker-compose.prod.yml up --build -d`
@@ -146,6 +147,8 @@ Production backend will refuse to start if required secrets are missing, if `JWT
 - PostgreSQL is not exposed publicly in `docker-compose.prod.yml`; it is available only inside the Docker network.
 
 Put a reverse proxy such as Nginx, Caddy, Traefik, or your hosting platform in front of these containers for HTTPS and public domains.
+
+An Nginx starting point is available in `nginx.sample`. It proxies `/api/` to backend port `4000` and all frontend traffic to port `8080`.
 
 ## API Summary
 

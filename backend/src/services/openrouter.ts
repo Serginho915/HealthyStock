@@ -297,26 +297,47 @@ export async function generateArticle(topic: string, masterPrompt = DEFAULT_MAST
   }
 
   const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.1-8b-instruct";
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_SITE_URL ?? "http://localhost",
-      "X-Title": "HealthyStock AI Writer"
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.7,
-      messages: [
-        { role: "system", content: masterPrompt },
-        {
-          role: "user",
-          content: `Create a new article topic: ${topic}. Return publication-ready markdown.`
-        }
-      ]
-    })
-  });
+  const endpoint = process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1/chat/completions";
+  const timeoutMs = envInt("OPENROUTER_TIMEOUT_MS", 45_000);
+  const maxTokens = envInt("OPENROUTER_MAX_OUTPUT_TOKENS", 2200);
+  const temperature = envFloat("OPENROUTER_TEMPERATURE", 0.7);
+  const maxInputChars = envInt("OPENROUTER_MAX_INPUT_CHARS", 16000);
+  const appName = process.env.OPENROUTER_APP_NAME ?? "HealthyStock AI Writer";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.OPENROUTER_SITE_URL ?? "http://localhost",
+        "X-Title": appName
+      },
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: masterPrompt.slice(0, maxInputChars) },
+          {
+            role: "user",
+            content: `Create a new article topic: ${topic}. Return publication-ready markdown.`
+          }
+        ]
+      })
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`OpenRouter timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -325,4 +346,14 @@ export async function generateArticle(topic: string, masterPrompt = DEFAULT_MAST
 
   const payload = (await res.json()) as OpenRouterResponse;
   return payload.choices?.[0]?.message?.content?.trim() ?? "No content generated";
+}
+
+function envInt(key: string, fallback: number): number {
+  const value = Number(process.env[key]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function envFloat(key: string, fallback: number): number {
+  const value = Number(process.env[key]);
+  return Number.isFinite(value) ? value : fallback;
 }

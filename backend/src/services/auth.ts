@@ -44,6 +44,7 @@ export function validateProductionAuthConfig() {
     ["CORS_ORIGIN", process.env.CORS_ORIGIN],
     ["JWT_SECRET", config.jwtSecret],
     ["REFRESH_TOKEN_SECRET", config.refreshSecret],
+    ["OPENROUTER_API_KEY", process.env.OPENROUTER_API_KEY],
     ["OPENROUTER_SITE_URL", process.env.OPENROUTER_SITE_URL]
   ]
     .filter(([, value]) => !value)
