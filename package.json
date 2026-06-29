@@ -1,0 +1,9 @@
+{
+  "name": "healthystock",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup:prod-env": "node scripts/setup-prod-env.mjs"
+  }
+}

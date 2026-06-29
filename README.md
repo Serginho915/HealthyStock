@@ -106,22 +106,24 @@ For production Docker deploys, also set:
 
 ## Production Deployment (Docker)
 
-1. Prepare compose variables in the project root:
-   - `cp .env.production.example .env`
-   - edit `.env`
-   - set `POSTGRES_PASSWORD`, `NEXT_PUBLIC_API_URL`, and `NEXT_PUBLIC_SITE_URL`
-2. Prepare backend runtime variables:
-   - `cp backend/.env.production.example backend/.env`
-   - edit `backend/.env`
-   - set `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, SMTP values if needed
-3. Build and start:
+1. Generate production env files:
+   - `npm run setup:prod-env`
+   - the script keeps existing non-placeholder values and only generates missing placeholder secrets
+2. Review generated files:
+   - root `.env`
+   - `backend/.env`
+3. Replace placeholders:
+   - root `.env`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`
+   - `backend/.env`: `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, SMTP values if needed
+   - generated `POSTGRES_PASSWORD`, `JWT_SECRET`, and `REFRESH_TOKEN_SECRET` should stay stable and should not be regenerated on every deploy
+4. Build and start:
    - `docker compose -f docker-compose.prod.yml up --build -d`
-4. Create the first superadmin:
+5. Create the first superadmin:
    - safer shell-history friendly form:
      - `SUPERADMIN_PASSWORD='your-strong-production-password' docker compose -f docker-compose.prod.yml exec -e SUPERADMIN_PASSWORD backend npm run create-superadmin -- admin@yourdomain.com`
    - direct form:
      - `docker compose -f docker-compose.prod.yml exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-production-password'`
-5. Verify:
+6. Verify:
    - `docker compose -f docker-compose.prod.yml ps`
    - `curl http://localhost:4000/api/health`
 
