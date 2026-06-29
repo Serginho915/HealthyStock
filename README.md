@@ -42,6 +42,7 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
    - SMTP can stay empty locally unless you want to test email subscriptions.
 3. Run:
    - `docker compose up -d --build`
+   - Docker development uses built images plus named volumes, not live source-code mounts. After changing backend or frontend code, rebuild the affected service with `docker compose up --build -d backend frontend`.
 4. Create the first superadmin:
    - `docker compose exec backend npm run create-superadmin -- admin@yourdomain.com 'your-strong-password-here'`
 5. Open:
@@ -51,7 +52,7 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
 
 ## Admin Setup
 
-Admin accounts are stored in PostgreSQL, not in `.env`. The database stores only `password_hash`, never the plain password.
+Admin accounts are stored in PostgreSQL. The database stores only `password_hash`, never the plain password.
 
 With Docker:
 
@@ -79,7 +80,8 @@ If this happened after switching from the old env-based auth to DB auth, the bro
 You can also clear stored refresh tokens locally:
 
 - stop the backend or make sure nobody is logged in
-- delete `backend/data/refresh-tokens.json`
+- Docker: `docker compose exec backend rm -f /app/data/refresh-tokens.json`
+- without Docker: delete `backend/data/refresh-tokens.json`
 - restart backend: `docker compose restart backend`
 
 This only logs admins out. It does not delete users from PostgreSQL.
@@ -173,10 +175,12 @@ An Nginx starting point is available in `nginx.sample`. It proxies `/api/` to ba
 ## Notes
 
 - Set `NEXT_PUBLIC_SITE_URL`, `CORS_ORIGIN`, and cookie domain settings when deploying to a real domain.
-- Generated/admin-edited posts are stored in `backend/data/generated-posts.json`.
-- Admin settings are stored in `backend/data/admin-settings.json`.
-- Refresh sessions are stored in `backend/data/refresh-tokens.json`.
-- Audit events are stored in `backend/data/audit-log.jsonl`.
+- In Docker, generated/admin-edited posts, admin settings, refresh sessions, and audit logs are stored in the backend data volume at `/app/data`.
+- Without Docker, those files are stored under `backend/data`.
+- Generated/admin-edited posts use `generated-posts.json`.
+- Admin settings use `admin-settings.json`.
+- Refresh sessions use `refresh-tokens.json`.
+- Audit events use `audit-log.jsonl`.
 - Runtime data files are ignored by git. Back up the backend data volume in production.
 - Admin users and password hashes are stored in PostgreSQL. Back up the PostgreSQL volume in production.
 - Admin article HTML is sanitized before saving. Back up both the PostgreSQL volume and backend data volume in production.

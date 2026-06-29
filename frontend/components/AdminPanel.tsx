@@ -65,7 +65,7 @@ export function AdminPanel() {
       }
     });
 
-    if (res.status === 401 && path.startsWith("/api/admin/")) {
+    if (res.status === 401 && path !== "/api/auth/refresh") {
       const nextToken = await refreshAccessToken();
       return request<T>(path, init, nextToken);
     }
@@ -219,12 +219,11 @@ export function AdminPanel() {
         <form onSubmit={login}>
           <h1>Admin</h1>
           <label>
-            Email
+            Username
             <input
               value={credentials.username}
               onChange={(event) => setCredentials((current) => ({ ...current, username: event.target.value }))}
-              autoComplete="email"
-              inputMode="email"
+              autoComplete="username"
               required
             />
           </label>
