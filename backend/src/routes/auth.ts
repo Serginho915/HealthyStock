@@ -64,9 +64,10 @@ router.post("/login", asyncHandler(async (req, res) => {
   });
   const accessToken = await createAccessToken(user.id);
   const refreshToken = await createRefreshToken(user.id);
+  const csrfToken = createCsrfToken();
   setRefreshCookie(res, refreshToken);
-  setCsrfCookie(res, createCsrfToken());
-  return res.json({ accessToken, user: { username: user.email, role: user.role } });
+  setCsrfCookie(res, csrfToken);
+  return res.json({ accessToken, csrfToken, user: { username: user.email, role: user.role } });
 }));
 
 router.post("/refresh", asyncHandler(async (req, res) => {
@@ -89,8 +90,9 @@ router.post("/refresh", asyncHandler(async (req, res) => {
   }
 
   setRefreshCookie(res, rotated.refreshToken);
-  setCsrfCookie(res, createCsrfToken());
-  return res.json({ accessToken: rotated.accessToken });
+  const csrfToken = createCsrfToken();
+  setCsrfCookie(res, csrfToken);
+  return res.json({ accessToken: rotated.accessToken, csrfToken });
 }));
 
 router.post("/logout", asyncHandler(async (req, res) => {

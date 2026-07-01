@@ -110,7 +110,7 @@ export function getCsrfCookieOptions() {
     sameSite,
     secure: process.env.NODE_ENV === "production",
     domain,
-    path: "/api/auth",
+    path: "/",
     maxAge: csrfTokenTtlMs
   } as const;
 }

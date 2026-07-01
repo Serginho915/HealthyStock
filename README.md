@@ -5,7 +5,7 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
 ## Stack
 
 - Backend: Node.js, Express, TypeScript
-- Frontend: Next.js (App Router), React, TypeScript, SCSS
+- Frontend: Vite, React, TypeScript, SCSS
 - Infra: Docker, Docker Compose, PostgreSQL
 - AI writing: OpenRouter API
 - Newsletter: SMTP via Nodemailer
@@ -30,7 +30,7 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
 - Admin panel for creating/editing articles and generation settings
 - Draft/published article status, delete for generated/overridden posts, and backend audit logging
 - Protected DB-backed admin auth with access token and httpOnly refresh cookie
-- SEO setup: meta tags, Open Graph, canonical tags, JSON-LD, Next robots and sitemap routes, semantic markup
+- SPA frontend with public blog pages and hidden `/admin` control room
 
 ## Local Development (Docker)
 
@@ -118,7 +118,7 @@ For production Docker deploys, also set:
    - root `.env.production`
    - `backend/.env.production`
 3. Replace placeholders:
-   - root `.env.production`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`
+   - root `.env.production`: `VITE_API_URL`
    - `backend/.env.production`: `CORS_ORIGIN`, `OPENROUTER_API_KEY`, `OPENROUTER_SITE_URL`, SMTP values if needed
    - optional OpenRouter tuning is available through `OPENROUTER_TIMEOUT_MS`, `OPENROUTER_MAX_INPUT_CHARS`, `OPENROUTER_MAX_OUTPUT_TOKENS`, and `OPENROUTER_TEMPERATURE`
    - root `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` are used by Docker Compose
@@ -177,9 +177,9 @@ An Nginx starting point is available in `nginx.sample`. It proxies `/api/` to ba
 
 ## Notes
 
-- Set `NEXT_PUBLIC_SITE_URL`, `CORS_ORIGIN`, and cookie domain settings when deploying to a real domain.
+- Set `VITE_API_URL`, `CORS_ORIGIN`, and cookie domain settings when deploying to a real domain.
 - Generated/admin-edited posts, admin settings, refresh sessions, subscribers, audit events, admin users, and password hashes are stored in PostgreSQL.
 - Legacy JSON files under `backend/data` are only used for one-time migration into PostgreSQL when the corresponding database table is empty.
 - Runtime data files are ignored by git. Back up the PostgreSQL volume in production.
 - Admin article HTML is sanitized before saving.
-- Production Docker images do not include local `backend/data` files, `.env`, `node_modules`, `.next`, or TypeScript build cache.
+- Production Docker images do not include local `backend/data` files, `.env`, `node_modules`, or TypeScript build cache.

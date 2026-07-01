@@ -45,8 +45,7 @@ console.log("- REFRESH_TOKEN_SECRET");
 console.log("- DATABASE_URL is synchronized from POSTGRES_* values");
 console.log("");
 console.log("Review and replace placeholders before deploying:");
-console.log("- NEXT_PUBLIC_API_URL");
-console.log("- NEXT_PUBLIC_SITE_URL");
+console.log("- VITE_API_URL");
 console.log("- CORS_ORIGIN");
 console.log("- OPENROUTER_API_KEY");
 console.log("- OPENROUTER_SITE_URL");
@@ -57,21 +56,21 @@ async function upsertEnvFile(examplePath, targetPath, generatedValues, forcedVal
   const example = await fs.readFile(examplePath, "utf-8");
   const existing = await readOptional(targetPath);
   const existingValues = parseEnv(existing);
-  const nextValues = { ...parseEnv(example), ...existingValues };
+  const envValues = { ...parseEnv(example), ...existingValues };
 
   for (const [key, value] of Object.entries(generatedValues)) {
-    if (shouldGenerate(nextValues[key])) {
-      nextValues[key] = value;
+    if (shouldGenerate(envValues[key])) {
+      envValues[key] = value;
     }
   }
 
   for (const [key, value] of Object.entries(forcedValues)) {
-    nextValues[key] = value;
+    envValues[key] = value;
   }
 
-  const output = renderEnv(example, nextValues);
+  const output = renderEnv(example, envValues);
   await fs.writeFile(targetPath, output, "utf-8");
-  return nextValues;
+  return envValues;
 }
 
 async function readOptional(filePath) {

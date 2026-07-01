@@ -68,8 +68,7 @@ ensureEnv({
   file: "frontend/.env",
   example: "frontend/.env.example",
   defaults: {
-    NEXT_PUBLIC_API_URL: "http://localhost:4000",
-    API_URL: "http://localhost:4000"
+    VITE_API_URL: "http://localhost:4000"
   }
 });
 

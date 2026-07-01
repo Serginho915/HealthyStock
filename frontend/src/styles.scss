@@ -29,6 +29,10 @@ a {
   color: inherit;
 }
 
+button {
+  font: inherit;
+}
+
 .container {
   width: min(1120px, 92vw);
   margin: 0 auto;
@@ -61,6 +65,13 @@ a {
   }
 }
 
+.logo-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
 .tagline {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.8rem;
@@ -71,7 +82,11 @@ a {
   margin-left: auto;
   margin-right: 18px;
 
-  a {
+  a,
+  button {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
     color: var(--brand);
     font-weight: 700;
     text-decoration: none;
@@ -301,10 +316,16 @@ a {
   background: color-mix(in srgb, var(--surface) 88%, white);
   border-radius: 16px;
   overflow: hidden;
+  cursor: pointer;
   transition: transform 0.2s ease;
 
   &:hover {
     transform: translateY(-3px);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--brand) 35%, transparent);
+    outline-offset: 3px;
   }
 
   img {
@@ -341,9 +362,13 @@ a {
   }
 
   .read-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
     color: var(--brand);
     font-weight: 700;
     text-decoration: none;
+    cursor: pointer;
   }
 }
 
@@ -447,6 +472,13 @@ a {
   }
 }
 
+.link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -471,6 +503,34 @@ a {
 
 .admin-page {
   padding: 28px 0 54px;
+}
+
+.admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.admin-kpi {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, white);
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+
+  span {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  strong {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
 }
 
 .admin-toolbar {
@@ -507,6 +567,21 @@ a {
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface) 88%, white);
   overflow: hidden;
+
+  .admin-list-head {
+    padding: 10px;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 8px;
+    background: #fff;
+  }
+
+  .empty-list {
+    margin: 0;
+    padding: 14px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+  }
 
   button {
     width: 100%;
@@ -546,6 +621,38 @@ a {
   padding: 18px;
   display: grid;
   gap: 14px;
+}
+
+.admin-meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.status-chip {
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.status-draft {
+  background: #fdf2dd;
+  color: #8c5a00;
+}
+
+.status-published {
+  background: #e4f7e6;
+  color: #11662f;
 }
 
 .admin-grid {
@@ -637,6 +744,10 @@ a {
   margin: 0;
 }
 
+.status-error {
+  color: #9f2d20;
+}
+
 .generation-editor {
   max-width: 100%;
 }
@@ -690,6 +801,10 @@ a {
 
   .admin-layout,
   .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-kpis {
     grid-template-columns: 1fr;
   }
 
