@@ -34,14 +34,15 @@ Full-stack blog platform where AI writes as Maria Iordanova in the style of "Blo
 
 ## Local Development (Docker)
 
-1. Copy env templates:
-   - `cp backend/.env.example backend/.env`
-   - `cp frontend/.env.example frontend/.env`
-2. Fill OpenRouter, `JWT_SECRET`, and `REFRESH_TOKEN_SECRET` in `backend/.env`.
+1. Prepare dev env files (creates missing `.env` files and auto-generates `JWT_SECRET` and `REFRESH_TOKEN_SECRET`):
+   - `npm run setup:dev-env`
+2. Fill `OPENROUTER_API_KEY` in `backend/.env` only if AI generation is needed.
    - For Docker, `DATABASE_URL` is overridden by `docker-compose.yml` and points to the `postgres` service.
    - SMTP can stay empty locally unless you want to test email subscriptions.
 3. Run:
-   - `docker compose up -d --build`
+   - `npm run dev:docker`
+   - This command runs env setup first (`setup:dev-env`), then `docker compose up -d --build`.
+   - Or run only Docker directly if env files are already prepared: `docker compose up -d --build`
    - Docker development uses built images, not live source-code mounts. After changing backend or frontend code, rebuild the affected service with `docker compose up --build -d backend frontend`.
    - Dev and production use separate image names. Local development keeps the existing `healthystock_postgres_data` volume so generated articles survive rebuilds.
 4. The local superadmin is created automatically by the `admin-seed` service:
