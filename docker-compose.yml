@@ -1,4 +1,11 @@
 services:
+  env-setup:
+    image: node:20-alpine
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["node", "scripts/setup-dev-env.mjs"]
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -34,12 +41,15 @@ services:
     env_file:
       - path: ./backend/.env
         format: raw
+        required: false
     environment:
       DATABASE_URL: postgres://healthystock:healthystock@postgres:5432/healthystock
       REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
     depends_on:
+      env-setup:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -60,6 +70,7 @@ services:
     env_file:
       - path: ./backend/.env
         format: raw
+        required: false
     environment:
       DATABASE_URL: postgres://healthystock:healthystock@postgres:5432/healthystock
       SUPERADMIN_PASSWORD: ${LOCAL_SUPERADMIN_PASSWORD:-MySecretPassword123!}
@@ -76,13 +87,16 @@ services:
       context: ./frontend
       target: dev
     env_file:
-      - ./frontend/.env
+      - path: ./frontend/.env
+        required: false
     environment:
       API_URL: http://backend:4000
       NEXT_PUBLIC_API_URL: http://localhost:4000
     ports:
       - "3000:3000"
     depends_on:
+      env-setup:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
 
