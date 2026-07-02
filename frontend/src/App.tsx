@@ -37,26 +37,63 @@ function navigate(path: string) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function ShareBar({ title }: { title: string }) {
-  const url = typeof window !== "undefined" ? window.location.href : "";
-  const encodedUrl = encodeURIComponent(url);
+function SocialIcon({ name }: { name: "x" | "threads" | "telegram" | "linkedin" }) {
+  if (name === "x") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.244 2H21.5l-7.11 8.126L22.75 22h-6.54l-5.12-6.693L5.23 22H1.97l7.605-8.692L1.55 2h6.705l4.627 6.118L18.244 2Zm-1.143 17.91h1.804L7.27 3.98H5.334L17.1 19.91Z" />
+      </svg>
+    );
+  }
+  if (name === "threads") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12.08 2C7.02 2 4 5.36 4 10.93v2.14C4 18.64 7.02 22 12.08 22c4.38 0 7.13-2.28 7.13-5.86 0-2.58-1.48-4.2-4.2-4.82-.16-2.32-1.53-3.77-3.88-3.77-1.5 0-2.76.52-3.73 1.55l1.22 1.42c.67-.7 1.46-1.05 2.37-1.05 1.1 0 1.78.62 1.94 1.74h-1.44c-2.72 0-4.41 1.3-4.41 3.38 0 2 1.55 3.3 3.94 3.3 2.35 0 3.82-1.2 4.14-3.45 1.26.45 1.9 1.24 1.9 2.37 0 2.02-1.88 3.29-4.88 3.29-3.82 0-5.99-2.48-5.99-6.9v-2.24c0-4.42 2.17-6.9 5.99-6.9 2.98 0 4.84 1.38 5.28 3.9h2.1C19.03 4.43 16.32 2 12.08 2Zm-1 13.96c-1.13 0-1.82-.52-1.82-1.36 0-.92.83-1.46 2.27-1.46h1.48c-.17 1.84-.83 2.82-1.93 2.82Z" />
+      </svg>
+    );
+  }
+  if (name === "telegram") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21.74 4.67 18.5 19.95c-.24 1.08-.88 1.34-1.78.84l-4.92-3.63-2.37 2.28c-.26.26-.48.48-.98.48l.35-5.02 9.13-8.25c.4-.35-.09-.55-.62-.2L6.03 13.56 1.17 12.04c-1.05-.33-1.07-1.05.22-1.55L20.4 3.16c.88-.33 1.65.2 1.34 1.51Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5ZM.33 8h4.33v14H.33V8Zm7 0h4.15v1.92h.06c.58-1.1 2-2.25 4.1-2.25 4.38 0 5.19 2.88 5.19 6.63V22H16.5v-6.82c0-1.63-.03-3.72-2.27-3.72-2.27 0-2.62 1.77-2.62 3.6V22H7.33V8Z" />
+    </svg>
+  );
+}
+
+function ShareBar({ title, url }: { title: string; url: string }) {
+  const absoluteUrl = typeof window !== "undefined" ? new URL(url, window.location.origin).href : url;
+  const shareText = `${title} ${absoluteUrl}`;
+  const encodedUrl = encodeURIComponent(absoluteUrl);
   const encodedTitle = encodeURIComponent(title);
+  const encodedShareText = encodeURIComponent(shareText);
   const targets = [
-    { label: "X", href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}` },
-    { label: "Threads", href: `https://www.threads.net/intent/post?text=${encodedTitle}%20${encodedUrl}` },
-    { label: "Telegram", href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}` },
-    { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` },
+    { label: "X", icon: "x" as const, href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}` },
+    { label: "Threads", icon: "threads" as const, href: `https://www.threads.net/intent/post?text=${encodedShareText}` },
+    { label: "Telegram", icon: "telegram" as const, href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}` },
+    { label: "LinkedIn", icon: "linkedin" as const, href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` },
   ];
 
   return (
     <aside className="share-bar" aria-label="Share this post">
-      <span>Share</span>
-      {targets.map((target) => (
-        <a key={target.label} href={target.href} target="_blank" rel="noreferrer">{target.label}</a>
-      ))}
+      <span className="share-label">Share this post</span>
+      <div className="share-actions">
+        {targets.map((target) => (
+          <a key={target.label} className="share-link" href={target.href} target="_blank" rel="noreferrer" aria-label={`Share on ${target.label}`}>
+            <SocialIcon name={target.icon} />
+            <span>{target.label}</span>
+          </a>
+        ))}
+      </div>
     </aside>
   );
 }
+
 
 function getStableCover(post: BlogPost) {
   if (post.coverImage) return post.coverImage;
@@ -287,7 +324,7 @@ function ArticlePage({ post }: { post?: BlogPost | null }) {
       </p>
       <img className="article-cover" src={getStableCover(post)} alt="" />
       <MedicalDisclaimer />
-      <ShareBar title={post.title} />
+      <ShareBar title={post.title} url={`/blog/${post.slug}`} />
       <section dangerouslySetInnerHTML={{ __html: post.content }} />
     </main>
   );
